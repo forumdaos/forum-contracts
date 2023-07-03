@@ -20,3 +20,6 @@
 	path = lib/safe-contracts
 	url = https://github.com/safe-global/safe-contracts
 	branch = v1.3.0
+[submodule "lib/FreshCryptoLib"]
+	path = lib/FreshCryptoLib
+	url = https://github.com/rdubois-crypto/FreshCryptoLib
