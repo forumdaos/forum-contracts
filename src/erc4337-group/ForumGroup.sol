@@ -89,14 +89,13 @@ contract ForumGroup is IAccount, Safe, MemberManager {
     function initalize(
         address entryPoint_,
         address fallbackHandler,
+        address[] memory precomputedPubKeyMultiples,
         uint256 voteThreshold_,
         uint256[2][] memory members_,
         bytes memory authData_,
         string memory clientDataStart_,
         string memory clientDataEnd_
-    )
-        external
-    {
+    ) external {
         // Create a placeholder owner
         address[] memory ownerPlaceholder = new address[](1);
         ownerPlaceholder[0] = address(0xdead);
@@ -106,8 +105,9 @@ contract ForumGroup is IAccount, Safe, MemberManager {
 
         uint256 len = members_.length;
 
-        if (entryPoint_ == address(0) || voteThreshold_ < 1 || voteThreshold_ > len || len < 1) revert
-            InvalidInitialisation();
+        if (entryPoint_ == address(0) || voteThreshold_ < 1 || voteThreshold_ > len || len < 1) {
+            revert InvalidInitialisation();
+        }
 
         _entryPoint = entryPoint_;
 
@@ -115,11 +115,11 @@ contract ForumGroup is IAccount, Safe, MemberManager {
 
         // Set up the members
         for (uint256 i; i < len;) {
-            // Create a hash used to identify the member
-            address membersAddress = publicKeyAddress(Member(members_[i][0], members_[i][1]));
+            // Create a hash used to identify the member, address is not used here so can be 0
+            address membersAddress = publicKeyAddress(Member(address(0), members_[i][0], members_[i][1]));
 
             // Add key pair to the members mapping
-            _members[membersAddress] = Member(members_[i][0], members_[i][1]);
+            _members[membersAddress] = Member(precomputedPubKeyMultiples[i], members_[i][0], members_[i][1]);
             // Add hash to the members array
             _membersAddressArray.push(membersAddress);
 
@@ -135,11 +135,11 @@ contract ForumGroup is IAccount, Safe, MemberManager {
     /// 						VALIDATION
     /// -----------------------------------------------------------------------
 
-    function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 missingAccountFunds)
-        external
-        override
-        returns (uint256 validationData)
-    {
+    function validateUserOp(
+        UserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) external override returns (uint256 validationData) {
         if (msg.sender != _entryPoint) revert NotFromEntrypoint();
 
         // The full message signed by the passkey is the authData and the hashed client data
@@ -148,7 +148,11 @@ contract ForumGroup is IAccount, Safe, MemberManager {
                 signingData.authData,
                 // Hash the packed client data & userOpHash to produce the challenge signed by the passkey offchain
                 sha256(
-                    abi.encodePacked(signingData.clientDataStart, Base64.encode(abi.encodePacked(userOpHash)), signingData.clientDataEnd)
+                    abi.encodePacked(
+                        signingData.clientDataStart,
+                        Base64.encode(abi.encodePacked(userOpHash)),
+                        signingData.clientDataEnd
+                    )
                 )
             )
         );
@@ -192,10 +196,10 @@ contract ForumGroup is IAccount, Safe, MemberManager {
              */
             (, bytes memory res) = ellipticCurveVerifier.delegatecall(
                 abi.encodeWithSelector(
-                    FCL_Elliptic_ZZ.ecdsa_verify.selector,
+                    FCL_Elliptic_ZZ.ecdsa_precomputed_verify.selector,
                     fullMessage,
                     [uint256(bytes32(userOp.signature[offset:])), uint256(bytes32(userOp.signature[offset + 32:]))],
-                    [_members[_membersAddressArray[signerIndex]].x, _members[_membersAddressArray[signerIndex]].y]
+                    _members[_membersAddressArray[signerIndex]].precomputedPubKeyMultiples
                 )
             );
 

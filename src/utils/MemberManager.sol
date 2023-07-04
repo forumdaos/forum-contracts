@@ -32,11 +32,13 @@ abstract contract MemberManager is SelfAuthorized {
 
     /**
      * @notice Member struct
+     * @param precomputedPubKeyMultiples Precomputed multiples of the public key of the member
      * @param x Public key of member
      * @param y Public key of member
      * @dev x & y are the public key of the members P-256 passkey
      */
     struct Member {
+        address precomputedPubKeyMultiples;
         uint256 x;
         uint256 y;
     }
@@ -144,6 +146,7 @@ abstract contract MemberManager is SelfAuthorized {
         return _voteThreshold;
     }
 
+    // TODO Adapt to give precomputes as well?
     function getMembers() public view returns (uint256[2][] memory members) {
         uint256 len = _membersAddressArray.length;
 
