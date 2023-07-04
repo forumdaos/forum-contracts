@@ -94,7 +94,10 @@ contract ForumAccountFactory {
      * @return account The deployed account
      * @dev Returns an existing account address so that entryPoint.getSenderAddress() works even after account creation
      */
-    function createForumAccount(uint256[2] calldata owner) external payable virtual returns (address payable account) {
+    function createForumAccount(
+        address precomputedPubKeyMultiples,
+        uint256[2] calldata owner
+    ) external payable virtual returns (address payable account) {
         bytes32 accountSalt = keccak256(abi.encodePacked(owner));
 
         address addr = getAddress(accountSalt);
@@ -113,7 +116,13 @@ contract ForumAccountFactory {
         if (!successCreate || account == address(0)) revert NullDeploy();
 
         ForumAccount(payable(account)).initialize(
-            entryPoint, owner, gnosisFallbackLibrary, authData, clientDataStart, clientDataEnd
+            entryPoint,
+            precomputedPubKeyMultiples,
+            gnosisFallbackLibrary,
+            owner,
+            authData,
+            clientDataStart,
+            clientDataEnd
         );
     }
 
@@ -127,7 +136,10 @@ contract ForumAccountFactory {
      */
     function getAddress(bytes32 salt) public view returns (address clone) {
         return address(
-            bytes20(keccak256(abi.encodePacked(bytes1(0xff), DETERMINISTIC_DEPLOYMENT_PROXY, salt, _createProxyDataHash)) << 96)
+            bytes20(
+                keccak256(abi.encodePacked(bytes1(0xff), DETERMINISTIC_DEPLOYMENT_PROXY, salt, _createProxyDataHash))
+                    << 96
+            )
         );
     }
 }

@@ -2,8 +2,9 @@
 pragma solidity ^0.8.15;
 
 import "./ForumAccount.base.t.sol";
+import {PrecomputeGenerator} from "../config/PrecomputeGenerator.t.sol";
 
-contract ForumAccountTestSetup is ForumAccountTestBase {
+contract ForumAccountTestSetup is ForumAccountTestBase, PrecomputeGenerator {
     /// -----------------------------------------------------------------------
     /// Setup
     /// -----------------------------------------------------------------------
@@ -12,8 +13,10 @@ contract ForumAccountTestSetup is ForumAccountTestBase {
         publicKey = createPublicKey(SIGNER_1);
         publicKey2 = createPublicKey(SIGNER_2);
 
+        createPrecomputeAddress();
+
         // Deploy an account to be used in tests later
-        forumAccountAddress = forumAccountFactory.createForumAccount(publicKey);
+        forumAccountAddress = forumAccountFactory.createForumAccount(precompute1, publicKey);
         forumAccount = ForumAccount(forumAccountAddress);
 
         // Deal funds to account
@@ -40,7 +43,7 @@ contract ForumAccountTestSetup is ForumAccountTestBase {
         assertEq(address(forumAccountFactory.gnosisFallbackLibrary()), address(handler), "handler not set");
         // Can not initialize the singleton
         vm.expectRevert("GS200");
-        forumAccountSingleton.initialize(entryPointAddress, publicKey, address(1), "", "", "");
+        forumAccountSingleton.initialize(entryPointAddress, precompute1, address(1), publicKey, "", "", "");
     }
 
     /// -----------------------------------------------------------------------
@@ -57,12 +60,13 @@ contract ForumAccountTestSetup is ForumAccountTestBase {
 
         // Can not initialize the same account twice
         vm.expectRevert("GS200");
-        forumAccount.initialize(entryPointAddress, publicKey, address(1), "", "", "");
+        forumAccount.initialize(entryPointAddress, precompute1, address(1), publicKey, "", "", "");
     }
 
     function testFactoryDeployFromEntryPoint() public {
         //Encode the calldata for the factory to create an account
-        bytes memory factoryCalldata = abi.encodeWithSignature("createForumAccount(uint256[2])", publicKey2);
+        bytes memory factoryCalldata =
+            abi.encodeWithSignature("createForumAccount(address,uint256[2])", precompute2, publicKey2);
 
         //Prepend the address of the factory
         bytes memory initCode = abi.encodePacked(address(forumAccountFactory), factoryCalldata);
@@ -98,7 +102,7 @@ contract ForumAccountTestSetup is ForumAccountTestBase {
 
         forumAccountFactory = new ForumAccountFactory(
     		forumAccountSingleton,
-    		entryPointAddress, 
+    		entryPointAddress,
     		address(handler),
     		'',
     '',
@@ -106,7 +110,7 @@ contract ForumAccountTestSetup is ForumAccountTestBase {
     	);
 
         // Deploy an account to be used in tests
-        tmpMumbai = forumAccountFactory.createForumAccount(publicKey);
+        tmpMumbai = forumAccountFactory.createForumAccount(precompute1, publicKey);
 
         // Fork Fuji and create an account from a fcatory
         vm.createSelectFork(vm.envString("FUJI_RPC_URL"));
@@ -121,7 +125,7 @@ contract ForumAccountTestSetup is ForumAccountTestBase {
     	);
 
         // Deploy an account to be used in tests
-        tmpFuji = forumAccountFactory.createForumAccount(publicKey);
+        tmpFuji = forumAccountFactory.createForumAccount(precompute1, publicKey);
 
         assertEq(tmpMumbai, tmpFuji, "address not the same");
     }

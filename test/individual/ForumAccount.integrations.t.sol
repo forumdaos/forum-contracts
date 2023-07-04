@@ -2,8 +2,9 @@
 pragma solidity ^0.8.15;
 
 import "./ForumAccount.base.t.sol";
+import {PrecomputeGenerator} from "../config/PrecomputeGenerator.t.sol";
 
-contract ForumAccountTestIntegrations is ForumAccountTestBase {
+contract ForumAccountTestIntegrations is ForumAccountTestBase, PrecomputeGenerator {
     /// -----------------------------------------------------------------------
     /// Setup
     /// -----------------------------------------------------------------------
@@ -12,8 +13,10 @@ contract ForumAccountTestIntegrations is ForumAccountTestBase {
         publicKey = createPublicKey(SIGNER_1);
         publicKey2 = createPublicKey(SIGNER_2);
 
+        createPrecomputeAddress();
+
         // Deploy an account to be used in tests later
-        forumAccountAddress = forumAccountFactory.createForumAccount(publicKey);
+        forumAccountAddress = forumAccountFactory.createForumAccount(precompute1, publicKey);
         forumAccount = ForumAccount(forumAccountAddress);
 
         // Deal funds to account

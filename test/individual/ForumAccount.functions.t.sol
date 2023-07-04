@@ -12,8 +12,10 @@ contract ForumAccountTestFunctions is ForumAccountTestBase {
         publicKey = createPublicKey(SIGNER_1);
         publicKey2 = createPublicKey(SIGNER_2);
 
+        createPrecomputeAddress();
+
         // Deploy an account to be used in tests later
-        forumAccountAddress = forumAccountFactory.createForumAccount(publicKey);
+        forumAccountAddress = forumAccountFactory.createForumAccount(precompute1, publicKey);
         forumAccount = ForumAccount(forumAccountAddress);
 
         // Deal funds to account
@@ -30,12 +32,15 @@ contract ForumAccountTestFunctions is ForumAccountTestBase {
     function testValidateUserOp() public {
         // Build user operation
         UserOperation memory userOp = buildUserOp(forumAccountAddress, 0, "", basicTransferCalldata);
-        userOp.signature =
-            abi.encode(signMessageForPublicKey(SIGNER_1, Base64.encode(abi.encodePacked(entryPoint.getUserOpHash(userOp)))));
+        userOp.signature = abi.encode(
+            signMessageForPublicKey(SIGNER_1, Base64.encode(abi.encodePacked(entryPoint.getUserOpHash(userOp))))
+        );
 
         vm.startPrank(entryPointAddress);
         assertEq(
-            forumAccount.validateUserOp(userOp, entryPoint.getUserOpHash(userOp), 0), 0, "validateUserOp should return 0"
+            forumAccount.validateUserOp(userOp, entryPoint.getUserOpHash(userOp), 0),
+            0,
+            "validateUserOp should return 0"
         );
     }
 

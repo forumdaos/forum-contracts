@@ -35,7 +35,11 @@ contract ForumAccount is Safe, BaseAccount {
     // Entry point allowed to call methods directly on this contract
     IEntryPoint internal _entryPoint;
 
+    // Address of the elliptic curve verifier
     address public immutable ellipticCurveVerifier;
+
+    // Address storing precomputed public key multiples, reducing gas for sig verification
+    address public precomputedPubKeyMultiples;
 
     // Public key for secp256r1 signer
     uint256[2] internal _owner;
@@ -69,22 +73,26 @@ contract ForumAccount is Safe, BaseAccount {
     /**
      * @notice Initialize the account
      * @param  entryPoint_ The entrypoint that can call methods directly on this contract
-     * @param  owner_ The public key of the owner of this account
+     * @param  precomputedPubKeyMultiples_ The address storing precomputed public key multiples
      * @param  gnosisFallbackLibrary The fallback handler for the Gnosis Safe
+     * @param  owner_ The public key of the owner of this account
+     * @param  authData_ The data to be signed by the user
+     * @param  clientDataStart_ The start of the client data to be signed by the user
+     * @param  clientDataEnd_ The end of the client data to be signed by the user
      * @dev This method should only be called once, and setup() will revert if already initialized
      */
     function initialize(
         address entryPoint_,
-        uint256[2] memory owner_,
+        address precomputedPubKeyMultiples_,
         address gnosisFallbackLibrary,
+        uint256[2] memory owner_,
         bytes memory authData_,
         string memory clientDataStart_,
         string memory clientDataEnd_
-    )
-        public
-        virtual
-    {
+    ) public virtual {
         _entryPoint = IEntryPoint(entryPoint_);
+
+        precomputedPubKeyMultiples = precomputedPubKeyMultiples_;
 
         _owner = owner_;
 
@@ -112,10 +120,12 @@ contract ForumAccount is Safe, BaseAccount {
      * EntryPoint wouldn't know to emit the UserOperationRevertReason event,
      * which the frontend/client uses to capture the reason for the failure.
      */
-    function executeAndRevert(address to, uint256 value, bytes memory data, Enum.Operation operation)
-        external
-        payable
-    {
+    function executeAndRevert(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) external payable {
         _requireFromEntryPoint();
 
         bool success = execute(to, value, data, operation, type(uint256).max);
@@ -161,12 +171,10 @@ contract ForumAccount is Safe, BaseAccount {
      * - The signature may be validated using a domain seperator
      * - More efficient validation of the hashing and conversion of authData is needed
      */
-    function _validateSignature(UserOperation calldata userOp, bytes32 userOpHash)
-        internal
-        virtual
-        override
-        returns (uint256 sigTimeRange)
-    {
+    function _validateSignature(
+        UserOperation calldata userOp,
+        bytes32 userOpHash
+    ) internal virtual override returns (uint256 sigTimeRange) {
         /**
          * @dev Validate the signature of the user operation.
          * Delegate call the ellipticCurveVerifier library address to call the ecdsa_verify function with parameters:
@@ -176,17 +184,21 @@ contract ForumAccount is Safe, BaseAccount {
          */
         (, bytes memory res) = ellipticCurveVerifier.delegatecall(
             abi.encodeWithSelector(
-                FCL_Elliptic_ZZ.ecdsa_verify.selector,
+                FCL_Elliptic_ZZ.ecdsa_precomputed_verify.selector,
                 sha256(
                     abi.encodePacked(
                         signingData.authData,
                         sha256(
-                            abi.encodePacked(signingData.clientDataStart, Base64.encode(abi.encodePacked(userOpHash)), signingData.clientDataEnd)
+                            abi.encodePacked(
+                                signingData.clientDataStart,
+                                Base64.encode(abi.encodePacked(userOpHash)),
+                                signingData.clientDataEnd
+                            )
                         )
                     )
                 ),
                 [uint256(bytes32(userOp.signature[:32])), uint256(bytes32(userOp.signature[32:]))],
-                [_owner[0], _owner[1]]
+                precomputedPubKeyMultiples
             )
         );
 
