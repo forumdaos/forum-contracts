@@ -18,6 +18,7 @@ import {Base64} from "@libraries/Base64.sol";
 import "./SafeTestConfig.t.sol";
 import "./BasicTestConfig.t.sol";
 import {SignatureHelper} from "./SignatureHelper.t.sol";
+import {PrecomputeGenerator} from "./PrecomputeGenerator.t.sol";
 
 contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
     // Entry point
@@ -35,7 +36,10 @@ contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
     // Factory for 4337 group accounts
     ForumGroupFactory public forumGroupFactory;
 
-    // Addresses for easy use in tests
+    // Used to deploy precomputed tables
+    PrecomputeGenerator internal precomputeGenerator = new PrecomputeGenerator();
+
+    // Address for easy use in tests
     address internal entryPointAddress;
 
     // Some public keys used as signers in tests
@@ -46,6 +50,11 @@ contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
     string internal constant SIGNER_1 = "1";
     string internal constant SIGNER_2 = "2";
 
+    // Precompute tables, deployed at set  addresses so we can easly etch them in tests
+    address internal precompute1 = address(0x1111);
+    address internal precompute2 = address(0x2222);
+    address[] internal inputPrecomputeAddresses;
+
     string internal authentacatorData = "1584482fdf7a4d0b7eb9d45cf835288cb59e55b8249fff356e33be88ecc546d11d00000000";
 
     uint192 internal constant BASE_NONCE_KEY = 0;
@@ -54,13 +63,18 @@ contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
         entryPoint = new EntryPoint();
         entryPointAddress = address(entryPoint);
 
+        publicKey = createPublicKey(SIGNER_1);
+        publicKey2 = createPublicKey(SIGNER_2);
+
         // The library is deployed and called externally
-        bytes memory ellipticLibraryByteCode =
-            abi.encodePacked(vm.getCode("FCL_Elliptic_ZZ.sol:FCL_Elliptic_ZZ"));
+        bytes memory ellipticLibraryByteCode = abi.encodePacked(vm.getCode("FCL_Elliptic_ZZ.sol:FCL_Elliptic_ZZ"));
         address ellipticAddress;
         assembly {
             ellipticAddress := create(0, add(ellipticLibraryByteCode, 0x20), mload(ellipticLibraryByteCode))
         }
+
+        vm.etch(precompute1, precomputeGenerator.generatePrecomputeTable(publicKey));
+        vm.etch(precompute2, precomputeGenerator.generatePrecomputeTable(publicKey2));
 
         forumAccountSingleton = new ForumAccount(ellipticAddress);
         forumGroupSingleton = new ForumGroup(address(forumAccountSingleton), ellipticAddress);
@@ -93,20 +107,21 @@ contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
         nonce: 0,
         initCode: new bytes(0),
         callData: new bytes(0),
-        callGasLimit: 10000000,
-        verificationGasLimit: 20000000,
-        preVerificationGas: 20000000,
+        callGasLimit: 10_000_000,
+        verificationGasLimit: 20_000_000,
+        preVerificationGas: 20_000_000,
         maxFeePerGas: 2,
         maxPriorityFeePerGas: 1,
         paymasterAndData: new bytes(0),
         signature: new bytes(0)
     });
 
-    function buildUserOp(address sender, uint256 nonce, bytes memory initCode, bytes memory callData)
-        public
-        view
-        returns (UserOperation memory userOp)
-    {
+    function buildUserOp(
+        address sender,
+        uint256 nonce,
+        bytes memory initCode,
+        bytes memory callData
+    ) public view returns (UserOperation memory userOp) {
         // Build on top of base op
         userOp = userOpBase;
 
@@ -118,21 +133,23 @@ contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
     }
 
     // Build payload which the entryPoint will call on the sender 4337 account
-    function buildExecutionPayload(address to, uint256 value, bytes memory data, Enum.Operation operation)
-        internal
-        pure
-        returns (bytes memory)
-    {
+    function buildExecutionPayload(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) internal pure returns (bytes memory) {
         return abi.encodeWithSignature("executeAndRevert(address,uint256,bytes,uint8)", to, value, data, operation);
     }
 
     // !!!!! combine with the above
-    function signAndFormatUserOpIndividual(UserOperation memory userOp, string memory signer1)
-        internal
-        returns (UserOperation[] memory)
-    {
-        userOp.signature =
-            abi.encode(signMessageForPublicKey(signer1, Base64.encode(abi.encodePacked(entryPoint.getUserOpHash(userOp)))));
+    function signAndFormatUserOpIndividual(
+        UserOperation memory userOp,
+        string memory signer1
+    ) internal returns (UserOperation[] memory) {
+        userOp.signature = abi.encode(
+            signMessageForPublicKey(signer1, Base64.encode(abi.encodePacked(entryPoint.getUserOpHash(userOp))))
+        );
 
         UserOperation[] memory userOpArray = new UserOperation[](1);
         userOpArray[0] = userOp;
@@ -142,10 +159,11 @@ contract ERC4337TestConfig is BasicTestConfig, SafeTestConfig, SignatureHelper {
 
     // Gathers signatures from signers and formats them into the signature field for the user operation
     // Maybe only one sig is needed, so siger2 may be empty
-    function signAndFormatUserOp(UserOperation memory userOp, string memory signer1, string memory signer2)
-        internal
-        returns (UserOperation[] memory)
-    {
+    function signAndFormatUserOp(
+        UserOperation memory userOp,
+        string memory signer1,
+        string memory signer2
+    ) internal returns (UserOperation[] memory) {
         uint256 signerCount;
         uint256[2] memory sig1;
         uint256[2] memory sig2;

@@ -9,11 +9,6 @@ contract ForumAccountTestFunctions is ForumAccountTestBase {
     /// -----------------------------------------------------------------------
 
     function setUp() public {
-        publicKey = createPublicKey(SIGNER_1);
-        publicKey2 = createPublicKey(SIGNER_2);
-
-        createPrecomputeAddress(publicKey, publicKey2);
-
         // Deploy an account to be used in tests later
         forumAccountAddress = forumAccountFactory.createForumAccount(precompute1, publicKey);
         forumAccount = ForumAccount(forumAccountAddress);
