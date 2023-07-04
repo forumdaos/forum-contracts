@@ -84,12 +84,12 @@ contract ForumGroupFactory {
      * @return forumGroup The deployed forum group
      * @dev Returns an existing account address so that entryPoint.getSenderAddress() works even after account creation
      */
-    function createForumGroup(string calldata _name, uint256 _voteThreshold, uint256[2][] calldata _members)
-        external
-        payable
-        virtual
-        returns (address forumGroup)
-    {
+    function createForumGroup(
+        string calldata _name,
+        uint256 _voteThreshold,
+        address[] memory precomputedPubKeyMultiples,
+        uint256[2][] calldata _members
+    ) external payable virtual returns (address forumGroup) {
         // ! Improve this salt - should be safely unique, and easily reusuable across chain
         // ! Should also prevent any frontrunning to deploy to this address by anyone else
         bytes32 accountSalt = keccak256(abi.encodePacked(_name));
@@ -111,7 +111,14 @@ contract ForumGroupFactory {
         if (!successCreate || forumGroup == address(0)) revert NullDeploy();
 
         ForumGroup(payable(forumGroup)).initalize(
-            entryPoint, gnosisFallbackLibrary, _voteThreshold, _members, authData, clientDataStart, clientDataEnd
+            entryPoint,
+            gnosisFallbackLibrary,
+            precomputedPubKeyMultiples,
+            _voteThreshold,
+            _members,
+            authData,
+            clientDataStart,
+            clientDataEnd
         );
 
         emit ForumGroupDeployed(forumGroup);
@@ -130,8 +137,11 @@ contract ForumGroupFactory {
     function getAddress(bytes32 salt) public view returns (address clone) {
         return address(
             bytes20(
-                keccak256(abi.encodePacked(bytes1(0xff), DETERMINISTIC_DEPLOYMENT_PROXY, salt, keccak256(_createForumGroupProxyData)))
-                    << 96
+                keccak256(
+                    abi.encodePacked(
+                        bytes1(0xff), DETERMINISTIC_DEPLOYMENT_PROXY, salt, keccak256(_createForumGroupProxyData)
+                    )
+                ) << 96
             )
         );
     }

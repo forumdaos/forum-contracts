@@ -9,15 +9,15 @@ contract ForumGroupTestSetup is ForumGroupTestBase {
     /// -----------------------------------------------------------------------
 
     function setUp() public {
-        // Create passkey signers
-        publicKey = createPublicKey(SIGNER_1);
-        publicKey2 = createPublicKey(SIGNER_2);
-
         // Format signers into arrays to be added to contract
         inputMembers.push([publicKey[0], publicKey[1]]);
+        inputPrecomputeAddresses.push(precompute1);
+        inputPrecomputeAddresses.push(precompute2);
 
         // Deploy a forum safe from the factory
-        forumGroup = ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputMembers)));
+        forumGroup = ForumGroup(
+            payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputPrecomputeAddresses, inputMembers))
+        );
         forumGroupAddress = address(forumGroup);
 
         // Deal the account some funds
@@ -34,7 +34,9 @@ contract ForumGroupTestSetup is ForumGroupTestBase {
     function testSetUpState() public {
         // Check group singelton is set in factory
         assertEq(
-            address(forumGroupFactory.forumGroupSingleton()), address(forumGroupSingleton), "forumGroupSingleton not set"
+            address(forumGroupFactory.forumGroupSingleton()),
+            address(forumGroupSingleton),
+            "forumGroupSingleton not set"
         );
         // Check 4337 entryPoint is set in factory
         assertEq(forumGroupFactory.entryPoint(), entryPointAddress, "entryPoint not set");
@@ -42,7 +44,9 @@ contract ForumGroupTestSetup is ForumGroupTestBase {
         assertEq(address(forumGroupFactory.gnosisFallbackLibrary()), address(handler), "handler not set");
         // Can not initialize the singleton
         vm.expectRevert("GS200");
-        forumGroupSingleton.initalize(entryPointAddress, address(1), uint256(1), inputMembers, "", "", "");
+        forumGroupSingleton.initalize(
+            entryPointAddress, address(1), inputPrecomputeAddresses, uint256(1), inputMembers, "", "", ""
+        );
     }
 
     function testSetupGroup() public {
@@ -63,20 +67,23 @@ contract ForumGroupTestSetup is ForumGroupTestBase {
 
         // Can not initialize the group again
         vm.expectRevert("GS200");
-        forumGroup.initalize(entryPointAddress, address(1), uint256(1), inputMembers, "", "", "");
+        forumGroup.initalize(
+            entryPointAddress, address(1), inputPrecomputeAddresses, uint256(1), inputMembers, "", "", ""
+        );
     }
 
     function testPublicKeyAddressMatches() public {
         assertEq(
-            forumGroup.publicKeyAddress(MemberManager.Member(publicKey[0], publicKey[1])),
+            forumGroup.publicKeyAddress(MemberManager.Member(address(0), publicKey[0], publicKey[1])),
             forumAccountFactory.getAddress(keccak256(abi.encodePacked(publicKey)))
         );
     }
 
     function testDeployViaEntryPoint() public {
         // Encode the calldata for the factory to create an account
-        bytes memory factoryCalldata =
-            abi.encodeCall(forumGroupFactory.createForumGroup, (GROUP_NAME_2, 1, inputMembers));
+        bytes memory factoryCalldata = abi.encodeCall(
+            forumGroupFactory.createForumGroup, (GROUP_NAME_2, 1, inputPrecomputeAddresses, inputMembers)
+        );
 
         //Prepend the address of the factory
         bytes memory initCode = abi.encodePacked(address(forumGroupFactory), factoryCalldata);
@@ -130,7 +137,7 @@ contract ForumGroupTestSetup is ForumGroupTestBase {
     	);
 
         // Deploy an account to be used in tests
-        tmpMumbai = forumGroupFactory.createForumGroup("test", 1, inputMembersCrossChain);
+        tmpMumbai = forumGroupFactory.createForumGroup("test", 1, inputPrecomputeAddresses, inputMembersCrossChain);
 
         // Fork Fuji and create an account from a fcatory
         vm.createSelectFork(vm.envString("FUJI_RPC_URL"));
@@ -142,7 +149,7 @@ contract ForumGroupTestSetup is ForumGroupTestBase {
     	);
 
         // Deploy an account to be used in tests
-        tmpFuji = forumGroupFactory.createForumGroup("test", 1, inputMembersCrossChain);
+        tmpFuji = forumGroupFactory.createForumGroup("test", 1, inputPrecomputeAddresses, inputMembersCrossChain);
 
         assertEq(tmpMumbai, tmpFuji, "address not the same");
     }

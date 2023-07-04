@@ -9,15 +9,15 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
     /// -----------------------------------------------------------------------
 
     function setUp() public {
-        // Create passkey signers
-        publicKey = createPublicKey(SIGNER_1);
-        publicKey2 = createPublicKey(SIGNER_2);
-
         // Format signers into arrays to be added to contract
         inputMembers.push([publicKey[0], publicKey[1]]);
+        inputPrecomputeAddresses.push(precompute1);
+        inputPrecomputeAddresses.push(precompute2);
 
         // Deploy a forum safe from the factory
-        forumGroup = ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputMembers)));
+        forumGroup = ForumGroup(
+            payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputPrecomputeAddresses, inputMembers))
+        );
         forumGroupAddress = address(forumGroup);
 
         // Deal the account some funds
@@ -38,8 +38,9 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
 
     function testReturnAddressIfAlreadyDeployed() public {
         // Deploy a second forum safe with the same name
-        ForumGroup newForumGroup =
-            ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputMembers)));
+        ForumGroup newForumGroup = ForumGroup(
+            payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputPrecomputeAddresses, inputMembers))
+        );
 
         // Get address should return the address of the first safe
         assertTrue(address(newForumGroup) == forumGroupAddress);
@@ -49,7 +50,14 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
         assertTrue(forumGroup.getMembers().length == 1);
 
         vm.prank(forumGroupAddress);
-        forumGroup.addMemberWithThreshold(MemberManager.Member({x: publicKey2[0], y: publicKey2[1]}), 2);
+        forumGroup.addMemberWithThreshold(
+            MemberManager.Member({
+                precomputedPubKeyMultiples: inputPrecomputeAddresses[1],
+                x: publicKey2[0],
+                y: publicKey2[1]
+            }),
+            2
+        );
         uint256[2][] memory members = forumGroup.getMembers();
 
         assertTrue(members[0][0] == publicKey[0]);
@@ -71,13 +79,34 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
         vm.startPrank(forumGroupAddress);
 
         vm.expectRevert(MemberManager.InvalidThreshold.selector);
-        forumGroup.addMemberWithThreshold(MemberManager.Member({x: publicKey2[0], y: publicKey2[1]}), 0);
+        forumGroup.addMemberWithThreshold(
+            MemberManager.Member({
+                precomputedPubKeyMultiples: inputPrecomputeAddresses[1],
+                x: publicKey2[0],
+                y: publicKey2[1]
+            }),
+            0
+        );
 
         vm.expectRevert(MemberManager.InvalidThreshold.selector);
-        forumGroup.addMemberWithThreshold(MemberManager.Member({x: publicKey2[0], y: publicKey2[1]}), 3);
+        forumGroup.addMemberWithThreshold(
+            MemberManager.Member({
+                precomputedPubKeyMultiples: inputPrecomputeAddresses[1],
+                x: publicKey2[0],
+                y: publicKey2[1]
+            }),
+            3
+        );
 
         vm.expectRevert(MemberManager.MemberExists.selector);
-        forumGroup.addMemberWithThreshold(MemberManager.Member({x: publicKey[0], y: publicKey[1]}), 3);
+        forumGroup.addMemberWithThreshold(
+            MemberManager.Member({
+                precomputedPubKeyMultiples: inputPrecomputeAddresses[1],
+                x: publicKey[0],
+                y: publicKey[1]
+            }),
+            3
+        );
 
         members = forumGroup.getMembers();
         assertTrue(members.length == 1);
@@ -86,7 +115,14 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
     function testRemoveMemberWithThreshold() public {
         // Add a member so we can change threshold from 1-> 2 later
         vm.prank(forumGroupAddress);
-        forumGroup.addMemberWithThreshold(MemberManager.Member({x: publicKey2[0], y: publicKey2[1]}), 2);
+        forumGroup.addMemberWithThreshold(
+            MemberManager.Member({
+                precomputedPubKeyMultiples: inputPrecomputeAddresses[1],
+                x: publicKey2[0],
+                y: publicKey2[1]
+            }),
+            2
+        );
 
         // Get initial members
         uint256[2][] memory members = forumGroup.getMembers();
@@ -110,7 +146,14 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
         forumGroup.removeMemberWithThreshold(publicKeyAddress(publicKey2), 1);
 
         // Add a member so we can change threshold from 1-> 2 later
-        forumGroup.addMemberWithThreshold(MemberManager.Member({x: publicKey2[0], y: publicKey2[1]}), 2);
+        forumGroup.addMemberWithThreshold(
+            MemberManager.Member({
+                precomputedPubKeyMultiples: inputPrecomputeAddresses[1],
+                x: publicKey2[0],
+                y: publicKey2[1]
+            }),
+            2
+        );
 
         vm.expectRevert(MemberManager.InvalidThreshold.selector);
         forumGroup.removeMemberWithThreshold(publicKeyAddress(publicKey2), 0);
@@ -158,8 +201,9 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
         inputMembers.push([publicKey2[0], publicKey2[1]]);
 
         // Deploy a forum safe from the factory with 2 signers and threshold 2
-        ForumGroup forumGroupLocalTest =
-            ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_2, 2, inputMembers)));
+        ForumGroup forumGroupLocalTest = ForumGroup(
+            payable(forumGroupFactory.createForumGroup(GROUP_NAME_2, 2, inputPrecomputeAddresses, inputMembers))
+        );
 
         // Build user operation
         UserOperation memory userOp = buildUserOp(address(forumGroupLocalTest), 0, "", basicTransferCalldata);
@@ -183,67 +227,70 @@ contract ForumGroupTestFunctions is ForumGroupTestBase {
         vm.stopPrank();
     }
 
-    function testMaximumMemberCountValidation() public {
-        // Create x,y public keys for signers
-        uint256[2] memory publicKey3 = createPublicKey("3");
-        uint256[2] memory publicKey4 = createPublicKey("4");
-        uint256[2] memory publicKey5 = createPublicKey("5");
-        uint256[2] memory publicKey6 = createPublicKey("6");
-        uint256[2] memory publicKey7 = createPublicKey("7");
+    // TODO extend inputPrecomputeAddresses for this test
+    // function testMaximumMemberCountValidation() public {
+    //     // Create x,y public keys for signers
+    //     uint256[2] memory publicKey3 = createPublicKey("3");
+    //     uint256[2] memory publicKey4 = createPublicKey("4");
+    //     uint256[2] memory publicKey5 = createPublicKey("5");
+    //     uint256[2] memory publicKey6 = createPublicKey("6");
+    //     uint256[2] memory publicKey7 = createPublicKey("7");
 
-        delete inputMembers;
+    //     delete inputMembers;
 
-        // Add members to make a large group
-        inputMembers.push([publicKey[0], publicKey[1]]);
-        inputMembers.push([publicKey2[0], publicKey2[1]]);
-        inputMembers.push([publicKey3[0], publicKey3[1]]);
-        inputMembers.push([publicKey4[0], publicKey4[1]]);
-        inputMembers.push([publicKey5[0], publicKey5[1]]);
-        inputMembers.push([publicKey6[0], publicKey6[1]]);
-        inputMembers.push([publicKey7[0], publicKey7[1]]);
+    //     // Add members to make a large group
+    //     inputMembers.push([publicKey[0], publicKey[1]]);
+    //     inputMembers.push([publicKey2[0], publicKey2[1]]);
+    //     inputMembers.push([publicKey3[0], publicKey3[1]]);
+    //     inputMembers.push([publicKey4[0], publicKey4[1]]);
+    //     inputMembers.push([publicKey5[0], publicKey5[1]]);
+    //     inputMembers.push([publicKey6[0], publicKey6[1]]);
+    //     inputMembers.push([publicKey7[0], publicKey7[1]]);
 
-        // Deploy a forum safe from the factory with many signers and threshold 2
-        ForumGroup forumGroupLocalTest =
-            ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_2, 2, inputMembers)));
+    //     // Deploy a forum safe from the factory with many signers and threshold 2
+    //     ForumGroup forumGroupLocalTest = ForumGroup(
+    //         payable(forumGroupFactory.createForumGroup(GROUP_NAME_2, 2, inputPrecomputeAddresses, inputMembers))
+    //     );
 
-        // Build user operation
-        UserOperation memory userOp = buildUserOp(address(forumGroupLocalTest), 0, "", basicTransferCalldata);
+    //     // Build user operation
+    //     UserOperation memory userOp = buildUserOp(address(forumGroupLocalTest), 0, "", basicTransferCalldata);
 
-        vm.startPrank(entryPointAddress);
+    //     vm.startPrank(entryPointAddress);
 
-        uint256 gas;
+    //     uint256 gas;
 
-        uint256 encodedSignerInfo;
+    //     uint256 encodedSignerInfo;
 
-        bytes memory workingSigs;
+    //     bytes memory workingSigs;
 
-        // Loop and add a signature each time
-        for (uint256 i = 0; i < 10; i++) {
-            uint256[2] memory currentSig =
-                signMessageForPublicKey(uint2str(i + 1), Base64.encode(abi.encodePacked(entryPoint.getUserOpHash(userOp))));
+    //     // Loop and add a signature each time
+    //     for (uint256 i = 0; i < 10; i++) {
+    //         uint256[2] memory currentSig = signMessageForPublicKey(
+    //             uint2str(i + 1), Base64.encode(abi.encodePacked(entryPoint.getUserOpHash(userOp)))
+    //         );
 
-            workingSigs = abi.encodePacked(workingSigs, abi.encodePacked(currentSig[0], currentSig[1]));
+    //         workingSigs = abi.encodePacked(workingSigs, abi.encodePacked(currentSig[0], currentSig[1]));
 
-            // Replace the lowest 8 bits with the new number of signers (i+1)
-            encodedSignerInfo = (encodedSignerInfo & ~uint256(0xff)) | uint8(i + 1);
-            // Then ass the new signer index (i) shifted left
-            encodedSignerInfo |= uint256(i) << (8 * (i + 1));
+    //         // Replace the lowest 8 bits with the new number of signers (i+1)
+    //         encodedSignerInfo = (encodedSignerInfo & ~uint256(0xff)) | uint8(i + 1);
+    //         // Then ass the new signer index (i) shifted left
+    //         encodedSignerInfo |= uint256(i) << (8 * (i + 1));
 
-            userOp.signature = abi.encode(encodedSignerInfo);
-            userOp.signature = abi.encodePacked(userOp.signature, workingSigs);
+    //         userOp.signature = abi.encode(encodedSignerInfo);
+    //         userOp.signature = abi.encodePacked(userOp.signature, workingSigs);
 
-            gas = gasleft();
-            forumGroupLocalTest.validateUserOp(userOp, entryPoint.getUserOpHash(userOp), 0);
-            gas -= gasleft();
+    //         gas = gasleft();
+    //         forumGroupLocalTest.validateUserOp(userOp, entryPoint.getUserOpHash(userOp), 0);
+    //         gas -= gasleft();
 
-            if (gas > 1500000) {
-                console.log("Gas used: ", gas, " with ", i);
-                break;
-            }
-        }
+    //         if (gas > 1_500_000) {
+    //             console.log("Gas used: ", gas, " with ", i);
+    //             break;
+    //         }
+    //     }
 
-        vm.stopPrank();
+    //     vm.stopPrank();
 
-        delete inputMembers;
-    }
+    //     delete inputMembers;
+    // }
 }

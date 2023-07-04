@@ -9,15 +9,15 @@ contract ForumGroupTestIntegrations is ForumGroupTestBase {
     /// -----------------------------------------------------------------------
 
     function setUp() public {
-        // Create passkey signers
-        publicKey = createPublicKey(SIGNER_1);
-        publicKey2 = createPublicKey(SIGNER_2);
-
         // Format signers into arrays to be added to contract
         inputMembers.push([publicKey[0], publicKey[1]]);
+        inputPrecomputeAddresses.push(precompute1);
+        inputPrecomputeAddresses.push(precompute2);
 
         // Deploy a forum safe from the factory
-        forumGroup = ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputMembers)));
+        forumGroup = ForumGroup(
+            payable(forumGroupFactory.createForumGroup(GROUP_NAME_1, 1, inputPrecomputeAddresses, inputMembers))
+        );
         forumGroupAddress = address(forumGroup);
 
         // Deal the account some funds
@@ -59,8 +59,9 @@ contract ForumGroupTestIntegrations is ForumGroupTestBase {
         inputMembers.push([publicKey2[0], publicKey2[1]]);
 
         // Deploy a forum safe from the factory with 2 signers and threshold 2
-        ForumGroup forumGroupLocalTest =
-            ForumGroup(payable(forumGroupFactory.createForumGroup(GROUP_NAME_2, 2, inputMembers)));
+        ForumGroup forumGroupLocalTest = ForumGroup(
+            payable(forumGroupFactory.createForumGroup(GROUP_NAME_2, 2, inputPrecomputeAddresses, inputMembers))
+        );
 
         deal(address(forumGroupLocalTest), 10 ether);
 
@@ -103,8 +104,10 @@ contract ForumGroupTestIntegrations is ForumGroupTestBase {
         assertTrue(members[0][1] == publicKey[1]);
 
         // Build add member calldata
-        bytes memory addMemberCalldata =
-            abi.encodeCall(forumGroup.addMemberWithThreshold, (MemberManager.Member(publicKey2[0], publicKey2[1]), 1));
+        bytes memory addMemberCalldata = abi.encodeCall(
+            forumGroup.addMemberWithThreshold,
+            (MemberManager.Member(inputPrecomputeAddresses[1], publicKey2[0], publicKey2[1]), 1)
+        );
 
         // Build a basic transaction to execute in some tests
         basicTransferCalldata = buildExecutionPayload(forumGroupAddress, 0, addMemberCalldata, Enum.Operation.Call);
