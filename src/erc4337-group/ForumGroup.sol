@@ -157,8 +157,11 @@ contract ForumGroup is IAccount, Safe, MemberManager {
             )
         );
 
+        // Extracted as local calldata variable to avoid stack too deep error later
+        bytes calldata fullSignature = userOp.signature;
+
         /**
-         * @dev userOp.signature is made up of 2 parts
+         * @dev fullSignature is made up of 2 parts
          * 1) The first word (32 bytes) encodes info about the signers:
          *		- The first byte shows how may signers voted
          *		- The next n bytes are the index of each signer in the members array
@@ -168,7 +171,7 @@ contract ForumGroup is IAccount, Safe, MemberManager {
          */
 
         // The first word encodes info about the signers (how many signed, and their indexes)
-        uint256 signerInfo = uint256(bytes32(userOp.signature[:32]));
+        uint256 signerInfo = uint256(bytes32(fullSignature[:32]));
 
         // Tracks how many votes have been verified
         uint256 count;
@@ -198,7 +201,7 @@ contract ForumGroup is IAccount, Safe, MemberManager {
                 abi.encodeWithSelector(
                     FCL_Elliptic_ZZ.ecdsa_precomputed_verify.selector,
                     fullMessage,
-                    [uint256(bytes32(userOp.signature[offset:])), uint256(bytes32(userOp.signature[offset + 32:]))],
+                    [uint256(bytes32(fullSignature[offset:])), uint256(bytes32(fullSignature[offset + 32:]))],
                     _members[_membersAddressArray[signerIndex]].precomputedPubKeyMultiples
                 )
             );
