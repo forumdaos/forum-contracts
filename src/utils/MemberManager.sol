@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@safe/common/SelfAuthorized.sol";
+import {SelfAuthorized} from "@safe/common/SelfAuthorized.sol";
 
 /// @title MemberManager - Manages a set of members and a voteThreshold to perform actions.
 /// @author Forum (Modified from Safe OwnerManager by Stefan George - <stefan@gnosis.pm> & Richard Meissner - <richard@gnosis.pm>)
@@ -44,7 +44,7 @@ abstract contract MemberManager is SelfAuthorized {
     }
 
     // Used to calcualte the address of the individual ERC-4337 account which members will have when deployed
-    bytes32 immutable _accountCreationProxyData;
+    bytes32 internal immutable _accountCreationProxyData;
 
     // Number of required signatures for a Safe transaction.
     uint256 internal _voteThreshold;

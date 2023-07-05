@@ -192,7 +192,7 @@ contract ForumGroup is IAccount, Safe, MemberManager {
              * Delegate call the ellipticCurveVerifier library address to call the ecdsa_verify function with parameters:
              * - Full message signed by the passkey
              * - Signature from the userOp
-             * - Public key of the passkey
+             * - precomputedPubKeyMultiples address of the passkey
              */
             (, bytes memory res) = ellipticCurveVerifier.delegatecall(
                 abi.encodeWithSelector(
